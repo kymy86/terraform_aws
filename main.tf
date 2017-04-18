@@ -3,71 +3,73 @@ provider "aws" {
     profile = "${var.aws_profile}"
 }
 
-resource "aws_vpc" "mars_vpc" {
-    cidr_block = "10.0.0.0/16"
-    tags = {
-        Name = "MarsVPC"
+module "security" {
+    source = "./security"
+}
+
+resource "aws_iam_role" "s3role" {
+    name = "s3MarsRole"
+
+    assume_role_policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "ec2.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
     }
+  ]
+}
+EOF
 }
 
-resource "aws_internet_gateway" "mars_odyssey" {
-    vpc_id = "${aws_vpc.mars_vpc.id}"
-    tags = {
-        Name = "Odyssey IGW"
+resource "aws_iam_role_policy" "s3role_policy" {
+    name = "s3_access_policy"
+    role = "${aws_iam_role.s3role.id}"
+    policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "s3:*",
+      "Resource": "*"
     }
+  ]
+}
+EOF
 }
 
-resource "aws_route_table" "planet_route" {
-    vpc_id = "${aws_vpc.mars_vpc.id}"
-    tags = {
-        Name = "Private route table"
-    }
+#create the bucket in S3
+resource "aws_s3_bucket" "earth_bucket" {
+    bucket = "${var.s3_bucket}"
 }
 
-resource "aws_route" "planet_access" {
-    route_table_id = "${aws_route_table.planet_route.id}"
-    destination_cidr_block = "0.0.0.0/0"
-    gateway_id = "${aws_nat_gateway.opportunity.id}"
+resource "aws_iam_instance_profile" "s3_profile" {
+    name = "s3_profile"
+    roles = ["${aws_iam_role.s3role.name}"]
 }
 
-resource "aws_route" "space_access" {
-    route_table_id = "${aws_vpc.mars_vpc.main_route_table_id}"
-    destination_cidr_block = "0.0.0.0/0"
-    gateway_id = "${aws_internet_gateway.mars_odyssey.id}"
+#creating aws launch configuration
+resource "aws_launch_configuration" "mars_conf" {
+    name = "mars autoscaling probes"
+    image_id = "${lookup(var.aws_amis, var.aws_region)}"
+    instance_type = "${var.asg_instance_type}"
+    iam_instance_profile = "${aws_iam_instance_profile.s3_profile.id}"
+    security_groups = ["${module.security.default_sc_id}"]
+    user_data = <<EOF
+#!/bin/bash
+yum update -y 
+yum install httpd -y
+service httpd start
+chkconfig httpd on
+echo "*/1 * * * * sudo aws s3 sync /var/www/html s3://${var.s3_bucket}" >> /etc/crontab
+aws s3 sync /var/www/html s3://${var.s3_bucket}
+EOF
 }
 
-resource "aws_subnet" "arcadia" {
-    vpc_id = "${aws_vpc.mars_vpc.id}"
-    cidr_block = "10.0.1.0/24"
-    map_public_ip_on_launch = true
-    tags = {
-        Name = "Arcadia Public VPC"
-    }
-}
-
-resource "aws_eip" "nat_ip" {
-    
-}
-
-resource "aws_nat_gateway" "opportunity" {
-    allocation_id = "${aws_eip.nat_ip.id}"
-    subnet_id = "${aws_subnet.arcadia.id}"
-}
-
-resource "aws_subnet" "hellas" {
-    vpc_id = "${aws_vpc.mars_vpc.id}"
-    cidr_block = "10.0.2.0/24"
-    tags = {
-        Name = "Hellas Private VPC"
-    }
-}
-
-resource "aws_route_table_association" "public_subnet_association" {
-    subnet_id = "${aws_subnet.arcadia.id}"
-    route_table_id = "${aws_vpc.mars_vpc.main_route_table_id}"
-}
-
-resource "aws_route_table_association" "private_subnet_association" {
-    subnet_id = "${aws_subnet.hellas.id}"
-    route_table_id = "${aws_route_table.planet_route.id}"
-}
+#creating bucket
+#syncing command aws s3 sync /var/www/html s3://bucket-name

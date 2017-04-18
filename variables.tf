@@ -16,3 +16,11 @@ variable "aws_amis" {
         us-west-1 = "ami-9e247efe"
     }
 }
+
+variable "s3_bucket" {
+    description = "S3 bucket where files are stored for autoscaling group"
+}
+
+variable "asg_instance_type" {
+    default  = "t2.micro"
+}
