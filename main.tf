@@ -3,8 +3,18 @@ provider "aws" {
     profile = "${var.aws_profile}"
 }
 
+resource "aws_key_pair" "mars_auth" {
+  key_name = "${var.aws_key_name}"
+  public_key = "${file(var.aws_public_key_path)}"
+}
+
+module "network" {
+    source = "./network"
+}
+
 module "security" {
     source = "./security"
+    vpc_id = "${module.network.mars_vpc_id}"
 }
 
 resource "aws_iam_role" "s3role" {
@@ -56,20 +66,69 @@ resource "aws_iam_instance_profile" "s3_profile" {
 #creating aws launch configuration
 resource "aws_launch_configuration" "mars_conf" {
     name = "mars autoscaling probes"
+
+    lifecycle { create_before_destroy = true }
+
     image_id = "${lookup(var.aws_amis, var.aws_region)}"
     instance_type = "${var.asg_instance_type}"
     iam_instance_profile = "${aws_iam_instance_profile.s3_profile.id}"
     security_groups = ["${module.security.default_sc_id}"]
+    key_name = "${var.aws_key_name}"
     user_data = <<EOF
 #!/bin/bash
 yum update -y 
 yum install httpd -y
 service httpd start
 chkconfig httpd on
+touch /var/www/html/healthy.html
 echo "*/1 * * * * sudo aws s3 sync /var/www/html s3://${var.s3_bucket}" >> /etc/crontab
 aws s3 sync /var/www/html s3://${var.s3_bucket}
 EOF
 }
 
-#creating bucket
-#syncing command aws s3 sync /var/www/html s3://bucket-name
+resource "aws_elb" "mars_elb" {
+  name = "mars-elb"
+  subnets = ["${module.network.pub_arcadia_subnet_id}"]
+  security_groups = ["${module.security.elb_sc_id}"]
+  idle_timeout = 60
+  
+  listener {
+    instance_port = 80
+    instance_protocol = "http"
+    lb_port = 80
+    lb_protocol = "http"
+  }
+  
+  health_check {
+    healthy_threshold = 10
+    unhealthy_threshold = 2
+    timeout = 5
+    target = "HTTP:80/healthy.html"
+    interval = 30
+  }
+
+  tags {
+    Name = "mars-elb"
+  }
+}
+
+resource "aws_autoscaling_group" "outpost_ag" {
+  lifecycle { create_before_destroy = true }
+  name = "mars-outposts-autoscaling-group"
+  max_size = 3
+  min_size = 2
+  health_check_grace_period = 300
+  health_check_type = "ELB"
+  wait_for_elb_capacity = 2
+  desired_capacity = 2
+  force_delete = true
+  launch_configuration = "${aws_launch_configuration.mars_conf.name}"
+  vpc_zone_identifier = ["${module.network.pub_arcadia_subnet_id}"]
+  load_balancers = ["${aws_elb.mars_elb.id}"]
+
+  tag {
+    key = "name"
+    value = "mars-autoscaled-instance"
+    propagate_at_launch = true
+  }
+}
