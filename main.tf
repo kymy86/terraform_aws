@@ -87,6 +87,7 @@ aws s3 sync /var/www/html s3://${var.s3_bucket}
 EOF
 }
 
+# createing elb
 resource "aws_elb" "mars_elb" {
   name = "mars-elb"
   subnets = ["${module.network.pub_arcadia_subnet_id}"]
@@ -134,6 +135,7 @@ resource "aws_autoscaling_group" "outpost_ag" {
   }
 }
 
+#creating db instance
 resource "aws_instance" "mars_db" {
   ami = "${lookup(var.aws_amis, var.aws_region)}"
   instance_type = "${var.db_instance_type}"
