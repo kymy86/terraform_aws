@@ -46,9 +46,9 @@ resource "aws_security_group" "mars_sc_default" {
     }
 }
 
-resource "aws_security_group" "mars_sc_aurora" {
-    name = "mars_aurora_security_group"
-    description = "Security group for RDS instances"
+resource "aws_security_group" "mars_sc_db" {
+    name = "mars_db_security_group"
+    description = "Security group for DB instance"
     vpc_id = "${var.vpc_id}"
 
     ingress {
@@ -73,6 +73,6 @@ resource "aws_security_group" "mars_sc_aurora" {
     }
 
     tags = {
-        Name = "Mars RDS security group"
+        Name = "Mars DB security group"
     }
 }

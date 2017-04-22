@@ -56,6 +56,7 @@ EOF
 #create the bucket in S3
 resource "aws_s3_bucket" "earth_bucket" {
     bucket = "${var.s3_bucket}"
+    force_destroy = true
 }
 
 resource "aws_iam_instance_profile" "s3_profile" {
@@ -130,5 +131,27 @@ resource "aws_autoscaling_group" "outpost_ag" {
     key = "name"
     value = "mars-autoscaled-instance"
     propagate_at_launch = true
+  }
+}
+
+resource "aws_instance" "mars_db" {
+  ami = "${lookup(var.aws_amis, var.aws_region)}"
+  instance_type = "${var.db_instance_type}"
+  key_name = "${var.aws_key_name}"
+  security_groups = ["${module.security.db_sc_id}"]
+  subnet_id = "${module.network.priv_hellas_subnet_id}"
+
+  ebs_block_device = {
+    device_name = "/dev/sdb"
+    volume_type = "io1"
+    volume_size = "10"
+    iops = "500"
+  }
+
+  user_data = "${file("./user_data/init.sh")}"
+
+  tags = {
+    key = "Name"
+    value = "Mars DB Instance"
   }
 }

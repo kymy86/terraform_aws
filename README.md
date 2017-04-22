@@ -1,5 +1,7 @@
 # Terraform script to build architecture in AWS ![version][version-badge]
 
-[version-badge]: https://img.shields.io/badge/version-0.0.1-blue.svg
+[version-badge]: https://img.shields.io/badge/version-0.0.3-blue.svg
 
-Work in progress
+With this terraform script you can create the following architecture:
+
+![](./reference_arch.png)

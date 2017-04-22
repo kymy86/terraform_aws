@@ -25,6 +25,10 @@ variable "asg_instance_type" {
     default  = "t2.micro"
 }
 
+variable "db_instance_type" {
+    default = "t2.medium"
+}
+
 variable "aws_public_key_path" {
     description = <<DESCRIPTION
 Path to the SSH public key to be used for authentication.
@@ -36,4 +40,12 @@ DESCRIPTION
 
 variable "aws_key_name" {
     description = "Name of the AWS key pair"
+}
+
+variable "db_user" {
+ description = "Aurora database user"   
+}
+
+variable "db_pass" {
+    description = "Aurora database password"
 }
