@@ -3,157 +3,129 @@ provider "aws" {
     profile = "${var.aws_profile}"
 }
 
-resource "aws_key_pair" "mars_auth" {
-  key_name = "${var.aws_key_name}"
-  public_key = "${file(var.aws_public_key_path)}"
+resource "aws_key_pair" "auth" {
+    key_name = "${var.aws_key_name}"
+    public_key = "${file(var.aws_public_key_path)}"
+}
+
+module "iam" {
+    source = "./iam"
+    app_name = "${var.app_name}"
 }
 
 module "network" {
     source = "./network"
+    app_name = "${var.app_name}"
+    vpc_cidr_block = "${var.vpc_cidr_block}"
+    az_zones = "${lookup(var.aws_az, var.aws_region)}"
 }
 
 module "security" {
     source = "./security"
-    vpc_id = "${module.network.mars_vpc_id}"
+    app_name = "${var.app_name}"
+    vpc_id = "${module.network.vpc_id}"
+    public_subnet = "${module.network.public_cidrs}"
+    ssh_cidr = "${var.ssh_cidr}"
 }
 
-resource "aws_iam_role" "s3role" {
-    name = "s3MarsRole"
-
-    assume_role_policy = <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {
-        "Service": "ec2.amazonaws.com"
-      },
-      "Action": "sts:AssumeRole"
-    }
-  ]
-}
-EOF
+module "database" {
+    source = "./database"
+    app_name = "${var.app_name}"
+    private_subnet = "${module.network.private_subnet_ids}"
+    db_disk_size = "${var.db_disk_size}"
+    db_instance_class = "${lookup(var.db_instance_class,var.db_instance_size)}"
+    db_master_username = "${var.db_master_username}"
+    db_master_password = "${var.db_master_password}"
+    db_sg_id = "${module.security.db_sg_id}"
 }
 
-resource "aws_iam_role_policy" "s3role_policy" {
-    name = "s3_access_policy"
-    role = "${aws_iam_role.s3role.id}"
-    policy = <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": "s3:*",
-      "Resource": "*"
-    }
-  ]
-}
-EOF
-}
-
-#create the bucket in S3
-resource "aws_s3_bucket" "earth_bucket" {
-    bucket = "${var.s3_bucket}"
+resource "aws_s3_bucket" "replica_bucket" {
+    bucket = "${var.app_name}-replica-bucket"
+    acl = "private"
+    region = "${var.aws_region}"
     force_destroy = true
 }
 
-resource "aws_iam_instance_profile" "s3_profile" {
-    name = "s3_profile"
-    roles = ["${aws_iam_role.s3role.name}"]
+data "template_file" "init_bastion" {
+    template = "${(file("./user_data/init_bastion.tpl"))}"
+    vars {
+        db_user = "${var.db_username}"
+        db_pass = "${var.db_password}"
+        db_name = "${module.database.database_name}"
+    }
 }
 
-#creating aws launch configuration
-resource "aws_launch_configuration" "mars_conf" {
-    name = "mars autoscaling probes"
-
-    lifecycle { create_before_destroy = true }
-
-    image_id = "${lookup(var.aws_amis, var.aws_region)}"
-    instance_type = "${var.asg_instance_type}"
-    iam_instance_profile = "${aws_iam_instance_profile.s3_profile.id}"
-    security_groups = ["${module.security.default_sc_id}"]
+resource "aws_instance" "bastion_host" {
+    ami = "${lookup(var.aws_amis, var.aws_region)}"
+    instance_type = "${var.instance_type}"
     key_name = "${var.aws_key_name}"
-    user_data = <<EOF
-#!/bin/bash
-yum update -y 
-yum install httpd -y
-service httpd start
-chkconfig httpd on
-touch /var/www/html/healthy.html
-echo "*/1 * * * * sudo aws s3 sync /var/www/html s3://${var.s3_bucket}" >> /etc/crontab
-aws s3 sync /var/www/html s3://${var.s3_bucket}
-EOF
+    security_groups = ["${module.security.bastion_sg_id}"]
+    subnet_id = "${element(module.network.public_subnet_ids,0)}"
+    iam_instance_profile = "${module.iam.instance_profile_id}"
+
+    ebs_block_device = {
+        device_name = "/dev/sdb"
+        volume_type = "gp2"
+        volume_size = "10"
+        iops = "100"
+    }
+
+    user_data  = "${data.template_file.init_bastion.rendered}"
+
+    tags = {
+        Name = "Bastion host instance"
+    }
 }
 
-# createing elb
-resource "aws_elb" "mars_elb" {
-  name = "mars-elb"
-  subnets = ["${module.network.pub_arcadia_subnet_id}"]
-  security_groups = ["${module.security.elb_sc_id}"]
-  idle_timeout = 60
-  
-  listener {
-    instance_port = 80
-    instance_protocol = "http"
-    lb_port = 80
-    lb_protocol = "http"
-  }
-  
-  health_check {
-    healthy_threshold = 10
-    unhealthy_threshold = 2
-    timeout = 5
-    target = "HTTP:80/healthy.html"
-    interval = 30
-  }
-
-  tags {
-    Name = "mars-elb"
-  }
+data "template_file" "init_db" {
+    template = "${file("./user_data/init_db.tpl")}"
+    vars {
+        db_user = "${var.db_master_username}"
+        db_pass = "${var.db_master_password}"
+        db_dns = "${module.database.database_dns}"
+    }
 }
 
-resource "aws_autoscaling_group" "outpost_ag" {
-  lifecycle { create_before_destroy = true }
-  name = "mars-outposts-autoscaling-group"
-  max_size = 3
-  min_size = 2
-  health_check_grace_period = 300
-  health_check_type = "ELB"
-  wait_for_elb_capacity = 2
-  desired_capacity = 2
-  force_delete = true
-  launch_configuration = "${aws_launch_configuration.mars_conf.name}"
-  vpc_zone_identifier = ["${module.network.pub_arcadia_subnet_id}"]
-  load_balancers = ["${aws_elb.mars_elb.id}"]
-
-  tag {
-    key = "name"
-    value = "mars-autoscaled-instance"
-    propagate_at_launch = true
-  }
+resource "null_resource" "provision_db" {
+    triggers {
+        db_dns = "${module.database.database_dns}"
+    }
+    connection {
+        type = "ssh"
+        host = "${aws_instance.bastion_host.public_ip}"
+        user = "${var.ssh_user}"
+        private_key = "${file(var.aws_private_key_path)}"
+        agent = false
+        timeout = "11m"
+    }
+    provisioner  "remote-exec" {
+        inline = "${data.template_file.init_db.rendered}"
+    }
 }
 
-#creating db instance
-resource "aws_instance" "mars_db" {
-  ami = "${lookup(var.aws_amis, var.aws_region)}"
-  instance_type = "${var.db_instance_type}"
-  key_name = "${var.aws_key_name}"
-  security_groups = ["${module.security.db_sc_id}"]
-  subnet_id = "${module.network.priv_hellas_subnet_id}"
+module "elb" {
+    source = "./elb"
+    app_name = "${var.app_name}"
+    subnets = "${module.network.public_subnet_ids}"
+    elb_sg = ["${module.security.elb_sg_id}"]
+    vpc_id = "${module.network.vpc_id}"
+}
 
-  ebs_block_device = {
-    device_name = "/dev/sdb"
-    volume_type = "io1"
-    volume_size = "10"
-    iops = "500"
-  }
-
-  user_data = "${file("./user_data/init.sh")}"
-
-  tags = {
-    key = "Name"
-    value = "Mars DB Instance"
-  }
+module "asg" {
+    source = "./asg"
+    aws_amis = "${var.aws_amis}"
+    aws_region = "${var.aws_region}"
+    instance_type = "${var.instance_type}"
+    iam_id = "${module.iam.instance_profile_id}"
+    instance_sg = "${module.security.instance_sg_id}"
+    app_name = "${var.app_name}"
+    replica_bucket_name = "${aws_s3_bucket.replica_bucket.id}"
+    db_name = "${module.database.database_name}"
+    db_user = "${var.db_username}"
+    db_pass = "${var.db_password}"
+    db_host = "${module.database.database_dns}"
+    key_name = "${var.aws_key_name}"
+    alb_tg_arn = "${module.elb.alb_tg_arn}"
+    az_zones = "${module.network.public_azs}"
+    subnets = "${module.network.public_subnet_ids}"
 }

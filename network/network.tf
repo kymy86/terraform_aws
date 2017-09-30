@@ -1,69 +1,73 @@
-resource "aws_vpc" "mars_vpc" {
-    cidr_block = "10.0.0.0/16"
+resource "aws_vpc" "vpc" {
+    cidr_block = "${var.vpc_cidr_block}"
     enable_dns_hostnames = true
     tags = {
-        Name = "MarsVPC"
+        Name = "${var.app_name} VPC"
     }
 }
 
-resource "aws_internet_gateway" "mars_odyssey" {
-    vpc_id = "${aws_vpc.mars_vpc.id}"
+resource "aws_internet_gateway" "igw" {
+    vpc_id = "${aws_vpc.vpc.id}"
     tags = {
-        Name = "Odyssey IGW"
+        Name = "${var.app_name} IGW"
     }
 }
 
-resource "aws_route_table" "planet_route" {
-    vpc_id = "${aws_vpc.mars_vpc.id}"
-    tags = {
-        Name = "Private route table"
-    }
-}
-
-resource "aws_route" "planet_access" {
-    route_table_id = "${aws_route_table.planet_route.id}"
+resource "aws_route" "public_access" {
+    route_table_id = "${aws_vpc.vpc.main_route_table_id}"
     destination_cidr_block = "0.0.0.0/0"
-    gateway_id = "${aws_nat_gateway.opportunity.id}"
+    gateway_id = "${aws_internet_gateway.igw.id}"
 }
 
-resource "aws_route" "space_access" {
-    route_table_id = "${aws_vpc.mars_vpc.main_route_table_id}"
-    destination_cidr_block = "0.0.0.0/0"
-    gateway_id = "${aws_internet_gateway.mars_odyssey.id}"
-}
-
-resource "aws_subnet" "arcadia" {
-    vpc_id = "${aws_vpc.mars_vpc.id}"
-    cidr_block = "10.0.1.0/24"
+resource "aws_subnet" "public_subnet" {
+    count = "${length(split(",", var.az_zones))}"
+    vpc_id = "${aws_vpc.vpc.id}"
+    cidr_block = "${cidrsubnet(var.vpc_cidr_block, 8, count.index+10)}"
+    availability_zone = "${element(split(",", var.az_zones), count.index)}"
     map_public_ip_on_launch = true
-    tags = {
-        Name = "Arcadia Public VPC"
+    tags {
+        Name = "${var.app_name} public subnet ${element(split(",", var.az_zones), count.index)}"
     }
 }
 
-resource "aws_eip" "nat_ip" {
-    
-}
-
-resource "aws_nat_gateway" "opportunity" {
-    allocation_id = "${aws_eip.nat_ip.id}"
-    subnet_id = "${aws_subnet.arcadia.id}"
-}
-
-resource "aws_subnet" "hellas" {
-    vpc_id = "${aws_vpc.mars_vpc.id}"
-    cidr_block = "10.0.2.0/24"
+resource "aws_route_table" "private_route_table" {
+    vpc_id = "${aws_vpc.vpc.id}"
     tags = {
-        Name = "Hellas Private VPC"
+        Name = "Private ${var.app_name} route table"
+    }
+}
+
+resource "aws_eip" "nat_eip" {}
+
+resource "aws_nat_gateway" "nat_gateway" {
+    allocation_id = "${aws_eip.nat_eip.id}"
+    subnet_id = "${aws_subnet.public_subnet.0.id}"
+}
+
+resource "aws_route" "private_access" {
+    route_table_id = "${aws_route_table.private_route_table.id}"
+    destination_cidr_block = "0.0.0.0/0"
+    gateway_id = "${aws_nat_gateway.nat_gateway.id}"
+}
+
+resource "aws_subnet" "private_subnet" {
+    count = "${length(split(",", var.az_zones))}"
+    vpc_id = "${aws_vpc.vpc.id}"
+    cidr_block = "${cidrsubnet(var.vpc_cidr_block, 8, count.index+20)}"
+    availability_zone = "${element(split(",", var.az_zones), count.index)}"
+    tags {
+        Name = "${var.app_name} private subnet ${element(split(",", var.az_zones), count.index)}"
     }
 }
 
 resource "aws_route_table_association" "public_subnet_association" {
-    subnet_id = "${aws_subnet.arcadia.id}"
-    route_table_id = "${aws_vpc.mars_vpc.main_route_table_id}"
+    count = "${length(split(",", var.az_zones))}"
+    subnet_id = "${element(aws_subnet.public_subnet.*.id, count.index)}"
+    route_table_id = "${aws_vpc.vpc.main_route_table_id}"
 }
 
 resource "aws_route_table_association" "private_subnet_association" {
-    subnet_id = "${aws_subnet.hellas.id}"
-    route_table_id = "${aws_route_table.planet_route.id}"
+    count = "${length(split(",", var.az_zones))}"
+    subnet_id = "${element(aws_subnet.private_subnet.*.id, count.index)}"
+    route_table_id = "${aws_route_table.private_route_table.id}"
 }

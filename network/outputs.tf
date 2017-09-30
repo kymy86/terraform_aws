@@ -1,15 +1,22 @@
-output "mars_vpc_id" {
-    value = "${aws_vpc.mars_vpc.id}"
+output "vpc_id" {
+    value = "${aws_vpc.vpc.id}"
+}
+output "public_subnet_ids" {
+    value = "${aws_subnet.public_subnet.*.id}"
 }
 
-output "priv_hellas_subnet_id" {
-    value = "${aws_subnet.hellas.id}"
+output "public_azs" {
+    value = "${aws_subnet.public_subnet.*.availability_zone}"
 }
 
-output "pub_arcadia_subnet_id" {
-    value = "${aws_subnet.arcadia.id}"
+output "public_cidrs" {
+    value = "${aws_subnet.public_subnet.*.cidr_block}"
 }
 
-output "nat_opportunity_id" {
-    value = "${aws_nat_gateway.opportunity.id}"
+output "private_subnet_ids" {
+    value = "${aws_subnet.private_subnet.*.id}"
+}
+
+output "private_azs" {
+    value = "${aws_subnet.private_subnet.*.availability_zone}"
 }

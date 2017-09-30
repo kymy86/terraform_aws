@@ -1,6 +1,55 @@
-resource "aws_security_group" "mars_sc_elb" {
-    name = "mars_enter_security_group"
-    description = "Main security group for Mars elb"
+resource "aws_security_group" "sc_aurora" {
+    name = "${var.app_name}-aurora-sg"
+    description = "Security group for database instance"
+    vpc_id = "${var.vpc_id}"
+
+    ingress {
+        from_port = 3306
+        to_port = 3306
+        protocol = "tcp"
+        cidr_blocks = ["${var.public_subnet}"]
+    }
+
+    egress {
+        from_port = 0
+        to_port = 0
+        protocol = -1
+        cidr_blocks = ["0.0.0.0/0"]
+    }
+
+    tags = {
+        Name = "Security group for db instance/s"
+    }
+}
+
+resource "aws_security_group" "sc_bastion" {
+    name = "${var.app_name}-bastion-instance-sg"
+    description = "Security group for basion host instance"
+    vpc_id  = "${var.vpc_id}"
+
+    ingress {
+        from_port = 22
+        to_port = 22
+        protocol = "tcp"
+        cidr_blocks = "${var.ssh_cidr}"
+    }
+
+    egress {
+        from_port = 0
+        to_port = 0
+        protocol = -1
+        cidr_blocks = ["0.0.0.0/0"]
+    }
+
+    tags {
+        Name = "Security group for bastion host"
+    }
+
+}
+
+resource "aws_security_group" "sc_elb" {
+    name = "${var.app_name}-elb-sg"
+    description = "Security group for ELB"
     vpc_id = "${var.vpc_id}"
 
     ingress {
@@ -10,22 +59,29 @@ resource "aws_security_group" "mars_sc_elb" {
         cidr_blocks = ["0.0.0.0/0"]
     }
 
-    egress {
-        from_port = 0
-        to_port = 0
-        protocol = "-1"
+    ingress {
+        from_port = 443
+        to_port = 443
+        protocol = "tcp"
         cidr_blocks = ["0.0.0.0/0"]
     }
 
-    tags = {
-        Name = "Mars elb secuirty group"
+    egress {
+        from_port = 0
+        to_port = 0
+        protocol = -1
+        cidr_blocks = ["0.0.0.0/0"]
+    }
+
+    tags {
+        Name = "Security group for ELB"
     }
 }
-
-resource "aws_security_group" "mars_sc_default" {
-    name = "mars_default_security_group"
-    description = "Main security group for instances in public subnet"
-    vpc_id = "${var.vpc_id}"
+    
+resource "aws_security_group" "sc_instance" {
+    name = "${var.app_name}-web-instance-sg"
+    description = "Security group for web server instance"
+    vpc_id  = "${var.vpc_id}"
 
     ingress {
         from_port = 80
@@ -34,45 +90,29 @@ resource "aws_security_group" "mars_sc_default" {
         cidr_blocks = ["0.0.0.0/0"]
     }
 
-    egress {
-        from_port = 0
-        to_port = 0
-        protocol = "-1"
+    ingress {
+        from_port = 443
+        to_port = 443
+        protocol = "tcp"
         cidr_blocks = ["0.0.0.0/0"]
     }
 
-    tags = {
-        Name = "Mars default security group"
-    }
-}
-
-resource "aws_security_group" "mars_sc_db" {
-    name = "mars_db_security_group"
-    description = "Security group for DB instance"
-    vpc_id = "${var.vpc_id}"
-
     ingress {
-        from_port = 3306
-        to_port = 3306
+        from_port = 22
+        to_port = 22
         protocol = "tcp"
-        cidr_blocks = ["10.0.1.0/24"]
-    }
-
-    ingress {
-        from_port = 3306
-        to_port = 3306
-        protocol = "tcp"
-        cidr_blocks = ["10.0.2.0/24"]
+        security_groups = ["${aws_security_group.sc_bastion.id}"]
     }
 
     egress {
         from_port = 0
         to_port = 0
-        protocol = "-1"
+        protocol = -1
         cidr_blocks = ["0.0.0.0/0"]
     }
 
-    tags = {
-        Name = "Mars DB security group"
+    tags {
+        Name = "Security group for web server instance"
     }
+
 }
