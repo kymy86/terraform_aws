@@ -26,10 +26,6 @@ variable "key_name" {
     type = "string"
 }
 
-variable "replica_bucket_name" {
-    type = "string"
-}
-
 variable "db_name" {
     type = "string"
 }
@@ -56,4 +52,8 @@ variable "az_zones" {
 
 variable "subnets" {
     type = "list"
+}
+
+variable "efs_id" {
+    type = "string"
 }

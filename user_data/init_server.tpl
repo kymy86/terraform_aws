@@ -3,7 +3,7 @@ sudo apt-get update -y
 sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
 sudo apt-get install nginx -y
 sudo apt-get install php-fpm php-mysql php-curl php-gd php-mbstring php-mcrypt php-xml php-xmlrpc -y
-sudo apt-get install python-pip -y
+sudo apt-get install python-pip nfs-common -y
 sudo pip install --upgrade pip
 sudo pip install awscli --upgrade
 
@@ -18,7 +18,11 @@ cat <<'EOF' >/var/www/html/health.htm
 ok
 EOF
 rm -rf wp-content/*
-aws s3 sync s3://${replica_bucket_name} wp-content --delete
+
+#Configuring EFS
+echo "$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone).${efs_id}.efs.${aws_region}.amazonaws.com:/ /var/www/html/wp-content nfs4 nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 0 0" >> /etc/fstab
+mount -a -t nfs4
+
 sudo chown -R www-data:www-data .
 sudo chmod -R 755 wp-content
 
@@ -54,18 +58,6 @@ if ( !defined('ABSPATH') )
 require_once(ABSPATH . 'wp-settings.php');
 EOF
 sudo mv /tmp/wp-config.php /var/www/html/
-
-#syncro operations
-cat << 'EOF' >/etc/cron.d/sync
-#!/bin/bash
-aws s3 sync s3://${replica_bucket_name} /var/www/html/wp-content
-aws s3 sync /var/www/html/wp-content s3://${replica_bucket_name}
-chown -R www-data:www-data /var/www/html/wp-content
-chmod -R 755 /var/www/html/wp-content
-EOF
-sudo chmod +x /etc/cron.d/sync
-sudo echo "*/5 * * * * root /etc/cron.d/sync" >> /etc/crontab
-
 
 #set-up nginx for hosting the WordPress website
 sudo echo "cgi.fix_pathinfo=0" >> /etc/php/7.0/fpm/php.ini

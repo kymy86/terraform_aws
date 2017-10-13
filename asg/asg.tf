@@ -1,11 +1,12 @@
 data "template_file" "init_server" {
     template = "${(file("./user_data/init_server.tpl"))}"
     vars {
-        replica_bucket_name = "${var.replica_bucket_name}"
         db_name = "${var.db_name}"
         db_user = "${var.db_user}"
         db_pass = "${var.db_pass}"
         db_host = "${var.db_host}"
+        efs_id = "${var.efs_id}"
+        aws_region = "${var.aws_region}"
     }
 }
 

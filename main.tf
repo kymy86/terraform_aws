@@ -39,11 +39,7 @@ module "database" {
     db_sg_id = "${module.security.db_sg_id}"
 }
 
-resource "aws_s3_bucket" "replica_bucket" {
-    bucket = "${var.app_name}-replica-bucket"
-    acl = "private"
-    region = "${var.aws_region}"
-    force_destroy = true
+resource "aws_efs_file_system" "efs" {
 }
 
 data "template_file" "init_bastion" {
@@ -119,7 +115,6 @@ module "asg" {
     iam_id = "${module.iam.instance_profile_id}"
     instance_sg = "${module.security.instance_sg_id}"
     app_name = "${var.app_name}"
-    replica_bucket_name = "${aws_s3_bucket.replica_bucket.id}"
     db_name = "${module.database.database_name}"
     db_user = "${var.db_username}"
     db_pass = "${var.db_password}"
@@ -128,4 +123,6 @@ module "asg" {
     alb_tg_arn = "${module.elb.alb_tg_arn}"
     az_zones = "${module.network.public_azs}"
     subnets = "${module.network.public_subnet_ids}"
+    efs_id = "${aws_efs_file_system.efs.id}"
+    aws_region = "${var.aws_region}"
 }
