@@ -28,6 +28,16 @@ module "security" {
     ssh_cidr = "${var.ssh_cidr}"
 }
 
+resource "aws_efs_file_system" "efs" {
+}
+
+resource "aws_efs_mount_target" "efs_mt" {
+    count        = "${length(split(",",lookup(var.aws_az, var.aws_region)))}"
+    file_system_id = "${aws_efs_file_system.efs.id}"
+    security_groups = ["${module.security.efs_sg_id}"]
+    subnet_id = "${element(module.network.public_subnet_ids, count.index)}"
+}
+
 module "database" {
     source = "./database"
     app_name = "${var.app_name}"
@@ -37,9 +47,6 @@ module "database" {
     db_master_username = "${var.db_master_username}"
     db_master_password = "${var.db_master_password}"
     db_sg_id = "${module.security.db_sg_id}"
-}
-
-resource "aws_efs_file_system" "efs" {
 }
 
 data "template_file" "init_bastion" {
@@ -84,7 +91,7 @@ data "template_file" "init_db" {
 
 resource "null_resource" "provision_db" {
     triggers {
-        db_dns = "${module.database.database_dns}"
+        cluster_ids = "${join(",", module.database.instances_ids)}"
     }
     connection {
         type = "ssh"

@@ -116,3 +116,27 @@ resource "aws_security_group" "sc_instance" {
     }
 
 }
+
+resource "aws_security_group" "efs_sg" {
+    name = "${var.app_name}-efs-sg"
+    description = "Security group for EFS"
+    vpc_id = "${var.vpc_id}"
+
+    ingress {
+        from_port = 2049
+        to_port = 2049
+        protocol = "tcp"
+        security_groups = ["${aws_security_group.sc_instance.id}"]
+    }
+
+    egress {
+        from_port = 0
+        to_port = 0
+        protocol = -1
+        cidr_blocks = ["0.0.0.0/0"]
+    }
+
+    tags {
+        Name = "Security group fro EFS"
+    }
+}

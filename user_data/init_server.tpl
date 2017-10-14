@@ -20,11 +20,12 @@ EOF
 rm -rf wp-content/*
 
 #Configuring EFS
-echo "$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone).${efs_id}.efs.${aws_region}.amazonaws.com:/ /var/www/html/wp-content nfs4 nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 0 0" >> /etc/fstab
-mount -a -t nfs4
+echo "${efs_id}.efs.${aws_region}.amazonaws.com:/ /var/www/html/wp-content nfs4 nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 0 0" >> /etc/fstab
+
+sudo mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 ${efs_id}.efs.${aws_region}.amazonaws.com:/ /var/www/html/wp-content
 
 sudo chown -R www-data:www-data .
-sudo chmod -R 755 wp-content
+sudo chmod -R 775 wp-content
 
 #Configuring wp-config file
 cat <<'EOF' >/tmp/wp-config.php

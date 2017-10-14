@@ -1,6 +1,6 @@
 # Terraform script to build a resilient WordPress website in AWS ![version][version-badge]
 
-[version-badge]: https://img.shields.io/badge/version-1.0.0-blue.svg
+[version-badge]: https://img.shields.io/badge/version-1.1.0-blue.svg
 
 With this terraform script you can create a resilient WordPress website.
 
@@ -9,7 +9,7 @@ The architecture is composed by:
 - WordPress instances that are part of an autoscaling group which spans in three public subnets. The autoscaling group uses an autoscaling policy based on the CPUUtilization CloudWatch alarm (if it's >=  80%, adds one more instance). Each EC2 instance is provisioned with nGINX as web-server and PHP 7.0. When the bastion-host is created, a user with permissions to access the WordPress db is created. 
 - Aurora clusters that live in private subnets
 - Bastion host (EC2 instance) to provide SSH access to the instances in the autoscaling group (if needed)
-- S3 bucket which is used to keep syncronized the instances by storing the wp-content contents
+- EFS where are stored the WordPress assets (theme, plugins, uploads etc)
 - ELB to manage the connections to the instances in the autoscaling group
 
 ## Terraform script variables

@@ -13,3 +13,7 @@ output "bastion_sg_id" {
 output "elb_sg_id" {
     value = "${aws_security_group.sc_elb.id}"
 }
+
+output  "efs_sg_id" {
+    value = "${aws_security_group.efs_sg.id}"
+}
