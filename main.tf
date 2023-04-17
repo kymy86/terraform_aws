@@ -17,7 +17,7 @@ module "network" {
     source = "./network"
     app_name = "${var.app_name}"
     vpc_cidr_block = "${var.vpc_cidr_block}"
-    az_zones = "${lookup(var.aws_az, var.aws_region)}"
+    az_zones = "${lookup(data.aws_availability_zones.azs.names, var.aws_region)}"
 }
 
 module "security" {
@@ -32,7 +32,7 @@ resource "aws_efs_file_system" "efs" {
 }
 
 resource "aws_efs_mount_target" "efs_mt" {
-    count        = "${length(split(",",lookup(var.aws_az, var.aws_region)))}"
+    count        = "${length(split(",",lookup(data.aws_availability_zones.azs.names, var.aws_region)))}"
     file_system_id = "${aws_efs_file_system.efs.id}"
     security_groups = ["${module.security.efs_sg_id}"]
     subnet_id = "${element(module.network.public_subnet_ids, count.index)}"
@@ -49,60 +49,33 @@ module "database" {
     db_sg_id = "${module.security.db_sg_id}"
 }
 
-data "template_file" "init_bastion" {
-    template = "${(file("./user_data/init_bastion.tpl"))}"
-    vars {
-        db_user = "${var.db_username}"
-        db_pass = "${var.db_password}"
-        db_name = "${module.database.database_name}"
-    }
-}
-
 resource "aws_instance" "bastion_host" {
-    ami = "${lookup(var.aws_amis, var.aws_region)}"
+    ami = data.aws_ami.aws_amis.id
     instance_type = "${var.instance_type}"
     key_name = "${var.aws_key_name}"
     security_groups = ["${module.security.bastion_sg_id}"]
     subnet_id = "${element(module.network.public_subnet_ids,0)}"
     iam_instance_profile = "${module.iam.instance_profile_id}"
 
-    ebs_block_device = {
+    ebs_block_device {
         device_name = "/dev/sdb"
-        volume_type = "gp2"
+        volume_type = "gp3"
         volume_size = "10"
         iops = "100"
     }
 
-    user_data  = "${data.template_file.init_bastion.rendered}"
+    user_data  = templatefile(
+    "${path.module}/user_data/init_bastion.tpl",
+    {
+      db_user = "${var.db_username}"
+        db_pass = "${var.db_password}"
+        db_name = "${module.database.database_name}"
+        db_dns = "${module.database.database_dns}"
+    }
+  )
 
     tags = {
         Name = "Bastion host instance"
-    }
-}
-
-data "template_file" "init_db" {
-    template = "${file("./user_data/init_db.tpl")}"
-    vars {
-        db_user = "${var.db_master_username}"
-        db_pass = "${var.db_master_password}"
-        db_dns = "${module.database.database_dns}"
-    }
-}
-
-resource "null_resource" "provision_db" {
-    triggers {
-        cluster_ids = "${join(",", module.database.instances_ids)}"
-    }
-    connection {
-        type = "ssh"
-        host = "${aws_instance.bastion_host.public_ip}"
-        user = "${var.ssh_user}"
-        private_key = "${file(var.aws_private_key_path)}"
-        agent = false
-        timeout = "11m"
-    }
-    provisioner  "remote-exec" {
-        inline = "${data.template_file.init_db.rendered}"
     }
 }
 
@@ -116,7 +89,7 @@ module "elb" {
 
 module "asg" {
     source = "./asg"
-    aws_amis = "${var.aws_amis}"
+    aws_ami = data.aws_ami.aws_amis.id
     aws_region = "${var.aws_region}"
     instance_type = "${var.instance_type}"
     iam_id = "${module.iam.instance_profile_id}"
@@ -131,5 +104,4 @@ module "asg" {
     az_zones = "${module.network.public_azs}"
     subnets = "${module.network.public_subnet_ids}"
     efs_id = "${aws_efs_file_system.efs.id}"
-    aws_region = "${var.aws_region}"
 }

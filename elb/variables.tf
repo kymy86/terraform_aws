@@ -1,15 +1,15 @@
 variable "app_name" {
-    type = "string"
+    type = string
 }
 
 variable "subnets" {
-    type = "list"
+    type = string
 }
 
 variable "elb_sg" {
-    type = "list"
+    type = list
 }
 
 variable "vpc_id" {
-    type = "string"
+    type = string
 }

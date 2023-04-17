@@ -1,59 +1,59 @@
-variable "aws_amis" {
-    type = "map"
+variable "aws_ami" {
+    type = string
 }
 
 variable "aws_region" {
-    type  = "string"
+    type  = string
 }
 
 variable "instance_type" {
-    type = "string"
+    type = string
 }
 
 variable "iam_id" {
-    type = "string"
+    type = string
 }
 
 variable "instance_sg" {
-    type = "string"
+    type = string
 }
 
 variable "app_name" {
-    type = "string"
+    type = string
 }
 
 variable "key_name" {
-    type = "string"
+    type = string
 }
 
 variable "db_name" {
-    type = "string"
+    type = string
 }
 
 variable "db_user" {
-    type = "string"
+    type = string
 }
 
 variable "db_pass" {
-    type = "string"
+    type = string
 }
 
 variable "db_host" {
-    type = "string"
+    type = string
 }
 
 variable "alb_tg_arn" {
-    type = "string"
+    type = string
 }
 
 variable "az_zones" {
-    type = "list"
+    type = list
 }
 
 variable "subnets" {
-    type = "list"
+    type = string
 }
 
 variable "efs_id" {
-    type = "string"
+    type = string
 }

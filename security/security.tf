@@ -41,7 +41,7 @@ resource "aws_security_group" "sc_bastion" {
         cidr_blocks = ["0.0.0.0/0"]
     }
 
-    tags {
+    tags = {
         Name = "Security group for bastion host"
     }
 
@@ -73,7 +73,7 @@ resource "aws_security_group" "sc_elb" {
         cidr_blocks = ["0.0.0.0/0"]
     }
 
-    tags {
+    tags = {
         Name = "Security group for ELB"
     }
 }
@@ -111,7 +111,7 @@ resource "aws_security_group" "sc_instance" {
         cidr_blocks = ["0.0.0.0/0"]
     }
 
-    tags {
+    tags = {
         Name = "Security group for web server instance"
     }
 
@@ -136,7 +136,7 @@ resource "aws_security_group" "efs_sg" {
         cidr_blocks = ["0.0.0.0/0"]
     }
 
-    tags {
-        Name = "Security group fro EFS"
+    tags = {
+        Name = "Security group from EFS"
     }
 }

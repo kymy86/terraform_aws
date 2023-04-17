@@ -3,15 +3,6 @@ variable "aws_region" {
     default = "eu-west-1"
 }
 
-variable "aws_az" {
-    description = "Availability zones"
-    default = {
-        eu-central-1 = "eu-central-1c,eu-central-1a,eu-central-1b"
-        eu-west-1 = "eu-west-1c,eu-west-1a,eu-west-1b"
-        eu-west-2 = "eu-west-2c,eu-west-2a,eu-west-2b"
-    }
-}
-
 variable "ssh_user" {
     description = "Username of SSH connection"
     default = "ubuntu"
@@ -26,16 +17,8 @@ variable "aws_profile" {
     default = "default"
 }
 
-variable "aws_amis" {
-    default = {
-        eu-central-1 = "ami-1e339e71"
-        eu-west-1 = "ami-785db401"
-        eu-west-2 = "ami-996372fd"
-    }
-}
-
 variable "instance_type" {
-    default = "t2.small"
+    default = "t3.small"
 }
 
 variable "aws_private_key_path" {
@@ -71,10 +54,10 @@ variable "db_disk_size" {
 variable "db_instance_class" {
     description = "Database instance class"
     default = {
-        small = "db.t2.small"
-        medium = "db.t2.medium"
-        large = "db.r3.large"
-        xlarge = "db.r3.xlarge"
+        small = "db.t3.small"
+        medium = "db.t3.medium"
+        large = "db.r5.large"
+        xlarge = "db.r5.xlarge"
     }
 }
 
@@ -99,6 +82,6 @@ variable "db_username" {
 }
 
 variable "ssh_cidr" {
-    type = "list"
+    type = list
     description = "CIDR blocks from where the SSH connection are allowed"
 }

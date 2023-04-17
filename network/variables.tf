@@ -1,11 +1,11 @@
 variable "app_name" {
-    type = "string"
+    type = string
 }
 
 variable "vpc_cidr_block" {
-    type = "string"
+    type = string
 }
 
 variable "az_zones" {
-    type = "string"
+    type = string
 }

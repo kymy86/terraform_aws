@@ -1,15 +1,3 @@
-data "template_file" "init_server" {
-    template = "${(file("./user_data/init_server.tpl"))}"
-    vars {
-        db_name = "${var.db_name}"
-        db_user = "${var.db_user}"
-        db_pass = "${var.db_pass}"
-        db_host = "${var.db_host}"
-        efs_id = "${var.efs_id}"
-        aws_region = "${var.aws_region}"
-    }
-}
-
 resource "aws_cloudwatch_metric_alarm" "cw_alarm" {
     alarm_name = "${var.app_name}-alarm"
     comparison_operator = "GreaterThanOrEqualToThreshold"
@@ -20,7 +8,7 @@ resource "aws_cloudwatch_metric_alarm" "cw_alarm" {
     statistic = "Average"
     threshold = 80
 
-    dimensions {
+    dimensions = {
         AutoScalingGroupName = "${aws_autoscaling_group.autoscaling_group.name}"
     }
 
@@ -30,20 +18,30 @@ resource "aws_cloudwatch_metric_alarm" "cw_alarm" {
 
 resource "aws_launch_configuration" "lc_conf" {
     name_prefix = "launch-px"
-    image_id = "${lookup(var.aws_amis, var.aws_region)}"
+    image_id = var.aws_ami
     instance_type = "${var.instance_type}"
     iam_instance_profile = "${var.iam_id}"
     security_groups = ["${var.instance_sg}"]
     key_name = "${var.key_name}"
     
-    ebs_block_device = {
+    ebs_block_device {
         device_name = "/dev/sdf"
-        volume_type = "gp2"
+        volume_type = "gp3"
         volume_size = "20"
         iops = "100"
     }
 
-    user_data = "${data.template_file.init_server.rendered}"
+    user_data = templatefile(
+    "${path.module}/user_data/init_server.tpl",
+    {
+      db_name = "${var.db_name}"
+        db_user = "${var.db_user}"
+        db_pass = "${var.db_pass}"
+        db_host = "${var.db_host}"
+        efs_id = "${var.efs_id}"
+        aws_region = "${var.aws_region}"
+    }
+  )
 }
 
 resource "aws_autoscaling_group" "autoscaling_group" {
@@ -57,7 +55,7 @@ resource "aws_autoscaling_group" "autoscaling_group" {
     target_group_arns = ["${var.alb_tg_arn}"]
     vpc_zone_identifier = ["${var.subnets}"]
     
-    tag {
+    tag  {
         key = "Name"
         value = "${var.app_name} web instance"
         propagate_at_launch = true

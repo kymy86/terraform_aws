@@ -2,11 +2,11 @@ resource "aws_alb" "alb" {
     name = "${var.app_name}-alb"
     internal = false
     subnets = ["${var.subnets}"]
-    security_groups = ["${var.elb_sg}"]
+    security_groups = var.elb_sg
 
     idle_timeout = 300
 
-    tags {
+    tags = {
         Name = "${var.app_name} ALB"
     }
 }

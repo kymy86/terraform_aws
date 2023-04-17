@@ -1,15 +1,15 @@
 variable "vpc_id" {
-    type = "string"
+    type = string
 }
 
 variable "app_name" {
-    type = "string"
+    type = string
 }
 
 variable "public_subnet" {
-    type = "list"
+    type = string
 }
 
 variable "ssh_cidr" {
-    type = "list"
+    type = list
 }

@@ -8,7 +8,7 @@ resource "aws_vpc" "vpc" {
 
 resource "aws_internet_gateway" "igw" {
     vpc_id = "${aws_vpc.vpc.id}"
-    tags = {
+    tags =  {
         Name = "${var.app_name} IGW"
     }
 }
@@ -25,7 +25,7 @@ resource "aws_subnet" "public_subnet" {
     cidr_block = "${cidrsubnet(var.vpc_cidr_block, 8, count.index+10)}"
     availability_zone = "${element(split(",", var.az_zones), count.index)}"
     map_public_ip_on_launch = true
-    tags {
+    tags = {
         Name = "${var.app_name} public subnet ${element(split(",", var.az_zones), count.index)}"
     }
 }
@@ -55,7 +55,7 @@ resource "aws_subnet" "private_subnet" {
     vpc_id = "${aws_vpc.vpc.id}"
     cidr_block = "${cidrsubnet(var.vpc_cidr_block, 8, count.index+20)}"
     availability_zone = "${element(split(",", var.az_zones), count.index)}"
-    tags {
+    tags = {
         Name = "${var.app_name} private subnet ${element(split(",", var.az_zones), count.index)}"
     }
 }

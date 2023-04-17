@@ -1,27 +1,27 @@
 variable "private_subnet" {
-    type = "list"
+    type = string
 }
 
 variable "db_disk_size" {
-    type = "string"
+    type = string
 }
 
 variable "app_name" {
-    type = "string"
+    type = string
 }
 
 variable "db_instance_class" {
-    type = "string"
+    type = string
 }
 
 variable "db_master_username" {
-    type = "string"
+    type = string
 }
 
 variable "db_master_password" {
-    type = "string"
+    type = string
 }
 
 variable "db_sg_id" {
-    type = "string"
+    type = string
 }
